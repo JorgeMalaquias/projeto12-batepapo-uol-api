@@ -12,8 +12,13 @@ mongoClient.connect().then(() => {
     db = mongoClient.db("database_uol");
 });
 
+
+
 const server = express();
 server.use([cors(), express.json()]);
+
+
+
 
 const participantsSchema = joi.object({
     name: joi.string().required()
@@ -25,11 +30,22 @@ const messageSchema = joi.object({
     from: joi.string().required()
 })
 
+
+
+
 function messagesFilter(currentUser, msgType, msgSender, msgReceiver) {
     if ((msgType === "private_message") && (currentUser !== msgReceiver) && (currentUser !== msgSender)) {
         return false;
     } else {
         return true;
+    }
+}
+function userFilter(user) {
+    const inativity = Date.now() - user.lastStatus;
+    if (inativity > 10500) {
+        return true;
+    } else {
+        return false;
     }
 }
 
@@ -146,4 +162,23 @@ server.post('/status', async (req, res) => {
 
 
 })
+
+
+
+async function removingUsers() {
+    const participants = await db.collection('participants').find().toArray();
+    const usersRemoved = participants.filter(userFilter);
+    usersRemoved.forEach(async (u) => {
+        await db.collection('participants').deleteOne({name:u.name});
+        await db.collection('messages').insertOne({ 
+            from: u.name, 
+            to: 'Todos', 
+            text: 'sai da sala...', 
+            type: 'status', 
+            time: `${dayjs().$H}:${dayjs().$m}:${dayjs().$s}`
+        });
+        console.log('removed');
+    });
+}
+setInterval(removingUsers, 15500);
 server.listen(5000);
