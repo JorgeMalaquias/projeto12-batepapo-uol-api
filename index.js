@@ -74,7 +74,7 @@ server.get('/participants', async (req, res) => {
 
 })
 server.post('/messages', async (req, res) => {
-    const {to, text, type} = req.body;
+    const { to, text, type } = req.body;
     const from = req.header.user;
     const validation = messageSchema.validate({
         to,
@@ -82,25 +82,31 @@ server.post('/messages', async (req, res) => {
         type,
         from
     })
-    if(validation.error){
-        console.log(validation.error.details);
-        return res.sendStatus(422);
+    try {
+        if (validation.error) {
+            console.log(validation.error.details);
+            return res.sendStatus(422);
+        }
+        if ((type !== 'message') && (type !== 'private_message')) {
+            return res.sendStatus(422);
+        }
+        const participantVerification = await db.collection('participants').findOne({ name: from });
+        if (!participantVerification) {
+            return res.sendStatus(422);
+        }
+        await db.collection('messages').insertOne({
+            from,
+            to,
+            text,
+            type,
+            time: `${dayjs().$H}:${dayjs().$m}:${dayjs().$s}`
+        });
+        res.sendStatus(201);
+    } catch (err) {
+        console.error(err);
+        res.sendStatus(500);
     }
-    if((type!=='message')&&(type!=='private_message')){
-        return res.sendStatus(422);
-    }
-    const participantVerification = await db.collection('participants').findOne({name:from});
-    if(!participantVerification){
-        return res.sendStatus(422);
-    }
-    await db.collection('messages').insertOne({
-        from,
-        to,
-        text,
-        type,
-        time:`${dayjs().$H}:${dayjs().$m}:${dayjs().$s}`
-    });
-    res.sendStatus(201);
+
 })
 server.get('/messages', async (req, res) => {
     const limit = parseInt(req.query.limit);
@@ -117,5 +123,27 @@ server.get('/messages', async (req, res) => {
         console.error(err);
         res.sendStatus(500);
     }
+})
+
+server.post('/status', async (req, res) => {
+    const name = req.header.user;
+
+    try {
+        const currentUser = await db.collection('participants').findOne({ name: name });
+        if (!currentUser) {
+            return res.sendStatus(404);
+        }
+        await db.collection('participants').updateOne({ name: name }, {
+            $set: {
+                lastStatus: Date.now()
+            }
+        });
+        res.sendStatus(200);
+    } catch (err) {
+        console.error(err);
+        res.sendStatus(500);
+    }
+
+
 })
 server.listen(5000);
