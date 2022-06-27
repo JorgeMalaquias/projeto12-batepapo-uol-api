@@ -91,7 +91,7 @@ server.get('/participants', async (req, res) => {
 })
 server.post('/messages', async (req, res) => {
     const { to, text, type } = req.body;
-    const from = req.header.user;
+    const from = req.headers.user;
     const validation = messageSchema.validate({
         to,
         text,
@@ -126,12 +126,15 @@ server.post('/messages', async (req, res) => {
 })
 server.get('/messages', async (req, res) => {
     const limit = parseInt(req.query.limit);
-    const name = req.header.user;
+    const name = req.headers.user;
     try {
         const messages = await db.collection('messages').find().toArray();
         const messagesAllowed = messages.filter((m) => messagesFilter(name, m.type, m.from, m.to));
         if (limit) {
-            res.send(messagesAllowed.slice(messagesAllowed.length - limit, messagesAllowed.length));
+            if (messagesAllowed.length > limit) {
+                return res.send(messagesAllowed.slice(messagesAllowed.length - limit, messagesAllowed.length));
+            }
+            res.send(messagesAllowed);
         } else {
             res.send(messagesAllowed);
         }
@@ -142,7 +145,7 @@ server.get('/messages', async (req, res) => {
 })
 
 server.post('/status', async (req, res) => {
-    const name = req.header.user;
+    const name = req.headers.user;
 
     try {
         const currentUser = await db.collection('participants').findOne({ name: name });
@@ -169,12 +172,12 @@ async function removingUsers() {
     const participants = await db.collection('participants').find().toArray();
     const usersRemoved = participants.filter(userFilter);
     usersRemoved.forEach(async (u) => {
-        await db.collection('participants').deleteOne({name:u.name});
-        await db.collection('messages').insertOne({ 
-            from: u.name, 
-            to: 'Todos', 
-            text: 'sai da sala...', 
-            type: 'status', 
+        await db.collection('participants').deleteOne({ name: u.name });
+        await db.collection('messages').insertOne({
+            from: u.name,
+            to: 'Todos',
+            text: 'sai da sala...',
+            type: 'status',
             time: `${dayjs().$H}:${dayjs().$m}:${dayjs().$s}`
         });
         console.log('removed');
