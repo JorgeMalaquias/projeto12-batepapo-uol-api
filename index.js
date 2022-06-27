@@ -19,6 +19,14 @@ const participantsSchema = joi.object({
     name: joi.string().required()
 })
 
+function messagesFilter(currentUser, msgType, msgSender, msgReceiver){
+    if((msgType==="private_message") && (currentUser!==msgReceiver) && (currentUser!==msgSender)){
+        return false;
+    }else{
+        return true;
+    }
+}
+
 server.post('/participants', async (req, res) => {
     const validation = participantsSchema.validate(req.body);
     if (validation.error) {
@@ -61,12 +69,14 @@ server.get('/participants', async (req, res) => {
 })
 server.get('/messages', async (req,res)=>{
     const limit = parseInt(req.query.limit);
+    const name = req.header.user;
     try{
         const messages = await db.collection('messages').find().toArray();
+        const messagesAllowed = messages.filter((m)=>messagesFilter(name,m.type,m.from,m.to));
         if(limit){
-            res.send(messages.slice(messages.length-limit,messages.length));
+            res.send(messagesAllowed.slice(messagesAllowed.length-limit,messagesAllowed.length));
         }else{
-            res.send(messages);
+            res.send(messagesAllowed);
         }
     }catch(err) {
         console.error(err);
